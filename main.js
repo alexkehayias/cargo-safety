@@ -3,10 +3,12 @@ var child_process = require('child_process');
 exports.handler = function(event, context, callback) {
     console.log(event);
 
+    var git_url = event['body-json']['git-url'];
+
     // spawn a child process to run the binary
     var proc = child_process.spawn(
 	'./target/release/harbor',
-	[event["git-url"]],
+	[git_url],
 	// proc.stdin, pro.stdout, proc.stderr]
 	{stdio: ['ignore', 'pipe', 'ignore']}
     );
