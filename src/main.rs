@@ -191,9 +191,9 @@ fn main() {
                                path=git_url_to_name(&url));
             let repo = get_or_clone(&url, &path);
             if is_crate_safe(path, repo) {
-                println!("[true]");
+                println!("true");
             } else {
-                println!("[false]");
+                println!("false");
             }
         }
         None => {
