@@ -1,0 +1,10 @@
+[package]
+name = "harbor"
+version = "0.1.0"
+authors = ["Alex Kehayias"]
+
+[dependencies]
+git2 = "0.6"
+syntex = "0.52.0"
+syntex_syntax = "0.52.0"
+syntex_errors = "0.52.0"

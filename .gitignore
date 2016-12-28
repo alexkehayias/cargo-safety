@@ -1,0 +1,6 @@
+target
+*.*~
+.DS_Store
+.harbor
+notes.org
+deploy.sh
