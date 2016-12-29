@@ -1,38 +1,63 @@
+#![feature(proc_macro)]
+
 extern crate syntex_syntax;
 extern crate syntex_errors;
 extern crate git2;
+#[macro_use]
+extern crate serde_derive;
+extern crate serde_json;
 
 use git2::Repository;
 use std::env;
 use std::rc::Rc;
 use std::path::{Path};
 use std::str::{from_utf8};
-use std::collections::{HashMap};
-use std::fmt::{self};
+use std::collections::{HashSet};
 use syntex_syntax::codemap::{CodeMap, Span};
 use syntex_syntax::parse::{self, ParseSess};
-use syntex_syntax::ast::{Crate, NodeId, Block, FnDecl, Mac, Unsafety, BlockCheckMode,
+use syntex_syntax::ast::{NodeId, Block, FnDecl, Mac, Unsafety, BlockCheckMode,
                          TraitItem, ImplItemKind, ImplItem, TraitItemKind};
 use syntex_syntax::visit::{self, Visitor, FnKind};
 use syntex_errors::{Handler};
 use syntex_errors::emitter::{ColorConfig};
 
 
+#[allow(non_camel_case_types)]
+#[derive(Hash, Eq, PartialEq, Debug, Clone, Serialize)]
+enum UnsafeKind {
+    unsafe_function,
+    unsafe_impl,
+    unsafe_block,
+    unsafe_trait,
+}
+
+#[derive(Hash, Eq, PartialEq, Debug, Clone, Serialize)]
+pub struct UnsafeCode {
+    kind: UnsafeKind,
+    occurences: String,
+}
+
+impl UnsafeCode {
+    fn new(kind: UnsafeKind, occurences: String) -> UnsafeCode {
+        UnsafeCode {kind: kind, occurences: occurences}
+    }
+}
+
 // The codemap is necessary to go from a `Span` to actual line & column
 // numbers for closures.
-struct UnsafeLocations<'a> {
+pub struct UnsafeCrate<'a> {
     // Format {
-    //   kind: <unsafe_block | unsafe_impl | unsafe_block | unsafe_trait>,
+    //   kind: <unsafe_function | unsafe_impl | unsafe_block | unsafe_trait>,
     //   location: <See CodeMap.span_to_expanded_string for format details>
     // }
     //
-    locations: HashMap<String, String>,
+    locations: HashSet<UnsafeCode>,
     // Used to go from a Span to line:column information
     codemap: &'a CodeMap,
 }
 
 // Unsafe code can be introduced in functions, blocks, traits, and implementations
-impl<'a> Visitor for UnsafeLocations<'a> {
+impl<'a> Visitor for UnsafeCrate<'a> {
     // Implement this otherwise it will panic when it hits a macro
     fn visit_mac(&mut self, _mac: &Mac) {}
 
@@ -49,14 +74,11 @@ impl<'a> Visitor for UnsafeLocations<'a> {
                 match unsafety {
                     Unsafety::Normal => (),
                     Unsafety::Unsafe => {
-                        self.locations.insert(
-                            String::from("kind"),
-                            String::from("unsafe_function"),
-                        );
-                        self.locations.insert(
-                            String::from("location"),
+                        let record = UnsafeCode::new(
+                            UnsafeKind::unsafe_function,
                             self.codemap.span_to_expanded_string(span),
                         );
+                        self.locations.insert(record);
                     },
                 };
             }
@@ -69,20 +91,17 @@ impl<'a> Visitor for UnsafeLocations<'a> {
         match block.rules {
             BlockCheckMode::Default => (),
             BlockCheckMode::Unsafe(_) => {
-                self.locations.insert(
-                    String::from("kind"),
-                    String::from("unsafe_block"),
-                );
-                self.locations.insert(
-                    String::from("location"),
+                let record = UnsafeCode::new(
+                    UnsafeKind::unsafe_block,
                     self.codemap.span_to_expanded_string(block.span),
                 );
-            }
-        }
+                self.locations.insert(record);
+            },
+        };
         visit::walk_block(self, block);
     }
 
-    // Capture any unsafe traits
+    // // Capture any unsafe traits
     fn visit_trait_item(&mut self, ti: &TraitItem) {
         match ti.node {
             TraitItemKind::Const(_, _) => (),
@@ -91,20 +110,17 @@ impl<'a> Visitor for UnsafeLocations<'a> {
             TraitItemKind::Method(ref sig, _) => match sig.unsafety {
                 Unsafety::Normal => (),
                 Unsafety::Unsafe => {
-                    self.locations.insert(
-                        String::from("kind"),
-                        String::from("unsafe_trait"),
-                    );
-                    self.locations.insert(
-                        String::from("location"),
+                    let record = UnsafeCode::new(
+                        UnsafeKind::unsafe_trait,
                         self.codemap.span_to_expanded_string(ti.span),
                     );
-                }
+                    self.locations.insert(record);
+                },
             },
         };
     }
 
-    // Capture any unsafe implementations
+    // // Capture any unsafe implementations
     fn visit_impl_item(&mut self, ii: &ImplItem) {
         match ii.node {
             ImplItemKind::Const(_, _) => (),
@@ -113,34 +129,25 @@ impl<'a> Visitor for UnsafeLocations<'a> {
             ImplItemKind::Method(ref sig, _) => match sig.unsafety {
                 Unsafety::Normal => (),
                 Unsafety::Unsafe => {
-                    self.locations.insert(
-                        String::from("kind"),
-                        String::from("unsafe_impl"),
-                    );
-                    self.locations.insert(
-                        String::from("location"),
+                    let record = UnsafeCode::new(
+                        UnsafeKind::unsafe_impl,
                         self.codemap.span_to_expanded_string(ii.span),
                     );
+                    self.locations.insert(record);
                 }
             },
         };
     }
 }
 
-// Finds all unsafe code by walking the crate via the Visitor trait
-fn find_unsafe_code<'a>(krate: &Crate, codemap: &'a Rc<CodeMap>)
-                        -> UnsafeLocations<'a> {
-    let mut unsafe_code = UnsafeLocations {
-        locations: HashMap::new(),
-        codemap: codemap,
-    };
-    unsafe_code.visit_mod(&krate.module, krate.span, NodeId::new(0));
-    unsafe_code
-}
-
 // Returns the project name by extracting it from the git url
 pub fn git_url_to_name(git_url: &String) -> String {
     git_url.split("/").collect::<Vec<&str>>().last().unwrap().to_lowercase()
+}
+
+#[test]
+fn test_git_url_to_name() {
+    assert!("harbor" == git_url_to_name(&String::from("https://github.com/alexkehayias/harbor")));
 }
 
 // Returns a repository by fetching it from disk or cloning it fresh
@@ -160,6 +167,12 @@ pub fn is_rust_file(file_path: &str) -> bool {
     file_path.contains(".rs")
 }
 
+#[test]
+fn test_is_rust_file() {
+    assert!(is_rust_file(&"src/main.rs"));
+    assert!(!is_rust_file(&"src/main.js"));
+}
+
 // Returns false for any directories that should be excluded based on
 // cargo conventions
 pub fn is_in_valid_dir(file_path: &str) -> bool {
@@ -168,62 +181,80 @@ pub fn is_in_valid_dir(file_path: &str) -> bool {
       file_path.contains("tests"))
 }
 
+#[test]
+fn test_is_in_valid_dir() {
+    assert!(is_in_valid_dir(&"src/main.rs"));
+    assert!(!is_in_valid_dir(&"examples/main.rs"));
+    assert!(!is_in_valid_dir(&"tests/test.rs"));
+    assert!(!is_in_valid_dir(&"target/test.rs"));
+}
+
 pub fn is_valid_file(file_path: &str) -> bool {
     is_rust_file(file_path) && is_in_valid_dir(file_path)
 }
 
-// Iterate through all files in the repo and return all safety infractions
-pub fn safety_infractions<'a>(prefix: String, repo: Repository)
-                              -> Vec<HashMap<String, String>> {
-    let codemap = Rc::new(CodeMap::new());
-    let tty_handler = Handler::with_tty_emitter(ColorConfig::Auto, true, false, Some(codemap.clone()));
-    let parse_session = ParseSess::with_span_handler(tty_handler, codemap.clone());
-    let mut accum: Vec<HashMap<String, String>> = Vec::new();
-
-    match repo.index() {
-        Ok(index) => {
-            // TODO parallize this
-            for i in index.iter().filter(|x| is_valid_file(from_utf8(&x.path).unwrap())) {
-                let file_path = from_utf8(&i.path).unwrap();
-                // println!("Checking file: {}", file_path);
-                let path_buf = Path::new(&prefix).join(file_path);
-                let ast = parse::parse_crate_from_file(path_buf.as_path(), &parse_session);
-                let blocks = find_unsafe_code(&ast.unwrap(), &codemap);
-                if blocks.locations.len() > 0 {
-                    // println!("Found unsafe: {:?}", blocks.locations);
-                    accum.push(blocks.locations);
-                };
-            }
-        },
-        Err(e) => panic!("Failed to parse: {}", e),
-    }
-
-    accum
-}
-
-#[derive(Debug)]
+#[derive(Debug, Serialize)]
 struct SafetyReport {
     repo_url: String,
     status: bool,
-    offenses: Vec<HashMap<String, String>>,
+    offenses: HashSet<UnsafeCode>,
 }
 
 impl SafetyReport {
     pub fn new(repo_url: String,
                status: bool,
-               offenses: Vec<HashMap<String, String>>) -> SafetyReport{
+               offenses: HashSet<UnsafeCode>) -> SafetyReport {
         SafetyReport {repo_url: repo_url, status: status, offenses: offenses}
     }
 }
 
-impl fmt::Display for SafetyReport {
-    // Displays in serialized json
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{{\"repo_url\":\"{}\",\"status\":{},\"offenses\":{:?}}}",
-               self.repo_url,
-               self.status.to_string(),
-               self.offenses)
+// Iterate through all files in the repo and return all safety infractions
+pub fn safety_infractions<'a>(prefix: String, repo: Repository)
+                              -> HashSet<UnsafeCode> {
+    let codemap = Rc::new(CodeMap::new());
+    let tty_handler = Handler::with_tty_emitter(ColorConfig::Auto, true, false, Some(codemap.clone()));
+    let parse_session = ParseSess::with_span_handler(tty_handler, codemap.clone());
+
+    match repo.index() {
+        Ok(index) => {
+            // TODO parallize this
+            index.iter()
+                .filter(|x| is_valid_file(from_utf8(&x.path).unwrap()))
+                .fold(HashSet::<UnsafeCode>::new(), |accum, i| {
+                      let file_path = from_utf8(&i.path).unwrap();
+                      let path_buf = Path::new(&prefix).join(file_path);
+                      let krate = parse::parse_crate_from_file(
+                          path_buf.as_path(),
+                          &parse_session
+                      ).unwrap();
+                      let mut unsafe_code = UnsafeCrate {
+                          locations: HashSet::<UnsafeCode>::new(),
+                          codemap: &codemap,
+                      };
+
+                      // Warning this has side-effects!
+                      unsafe_code.visit_mod(&krate.module, krate.span, NodeId::new(0));
+
+                      if unsafe_code.locations.len() > 0 {
+                          accum.union(&unsafe_code.locations)
+                              .cloned()
+                              .collect::<HashSet<UnsafeCode>>()
+                      } else {
+                          accum
+                      }
+                })
+        },
+        Err(e) => panic!("Failed to parse: {}", e),
     }
+}
+
+#[test]
+// Tests the integration between a git repo and finding unsafe code
+// This test uses the harbor repo (since we are in it).
+fn test_safety_infractions() {
+    let repo = Repository::open("../harbor");
+    let actual = safety_infractions(String::from("../harbor"), repo.unwrap());
+    assert!(actual.len() == 0);
 }
 
 // Called with an argument for a git url of the project to check
@@ -244,10 +275,10 @@ fn main() {
             let infractions = safety_infractions(path, repo);
             let passed = infractions.len() == 0;
             let report = SafetyReport::new(url, passed, infractions);
-            println!("{}", report);
+            println!("{}", serde_json::to_string(&report).unwrap());
         }
         None => {
-            return println!("Please provide a git repo url.");
+            panic!("Please provide a git repo url.");
         }
     };
 }
