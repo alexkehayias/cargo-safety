@@ -171,7 +171,7 @@ fn main() {
             let infractions = safety_infractions(path, repo);
             let passed = infractions.len() == 0;
             let report = SafetyReport::new(url, passed, infractions);
-            println!("{}", serde_json::to_string(&report).unwrap());
+            print!("{}", serde_json::to_string(&report).unwrap());
         }
         None => {
             panic!("Please provide a git repo url.");
