@@ -9,7 +9,7 @@ exports.handler = function(event, context, callback) {
     var proc = child_process.spawn(
 	'./target/release/harbor',
 	[git_url],
-	// proc.stdin, pro.stdout, proc.stderr]
+	// proc.stdin, pro.stdout, proc.stderr
 	{stdio: ['ignore', 'pipe', 'ignore']}
     );
 
