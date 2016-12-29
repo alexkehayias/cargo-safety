@@ -8,7 +8,7 @@ extern crate serde_derive;
 extern crate serde_json;
 extern crate harbor;
 
-use git2::{Repository, Oid, ResetType, ObjectType};
+use git2::{Repository, Oid, ResetType, ObjectType, BranchType};
 use std::env;
 use std::rc::Rc;
 use std::path::{Path};
@@ -34,10 +34,29 @@ fn test_git_url_to_name() {
     assert!("harbor" == git_url_to_name(&String::from("https://github.com/alexkehayias/harbor")));
 }
 
-// Returns a repository by fetching it from disk or cloning it fresh
+// Returns a repository by fetching it from disk or cloning it
+// If the repo already exists it will fetch the latest from origin
 pub fn get_or_clone(git_url: &String, path: &String) -> Repository {
     match Repository::open(path) {
-        Ok(repo) => repo,
+        // If we already have it on disk, fetch the latest
+        Ok(repo) => {
+            repo.find_remote(&"origin")
+                .unwrap()
+                .fetch(&[], None, None)
+                .unwrap();
+            repo.set_head(
+                // TODO: this is gross, why can't I let bind this without
+                // the borrow checker throwing up?
+                &repo.find_branch("origin/master", BranchType::Remote)
+                    .unwrap()
+                    .get()
+                    .name()
+                    .unwrap()
+            ).unwrap();
+            repo.checkout_head(None).unwrap();
+            repo
+        },
+        // Otherwise clone it
         Err(_) => {
             match Repository::clone(git_url, path) {
                 Ok(repo) => repo,
