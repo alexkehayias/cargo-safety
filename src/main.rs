@@ -85,38 +85,33 @@ pub fn safety_infractions<'a>(prefix: String, repo: Repository)
     let codemap = Rc::new(CodeMap::new());
     let tty_handler = Handler::with_tty_emitter(ColorConfig::Auto, true, false, Some(codemap.clone()));
     let parse_session = ParseSess::with_span_handler(tty_handler, codemap.clone());
+    let index = repo.index().unwrap();
 
-    match repo.index() {
-        Ok(index) => {
-            // TODO parallize this
-            index.iter()
-                .filter(|x| is_valid_file(from_utf8(&x.path).unwrap()))
-                .fold(HashSet::<UnsafeCode>::new(), |accum, i| {
-                      let file_path = from_utf8(&i.path).unwrap();
-                      let path_buf = Path::new(&prefix).join(file_path);
-                      let krate = parse::parse_crate_from_file(
-                          path_buf.as_path(),
-                          &parse_session
-                      ).unwrap();
-                      let mut unsafe_code = UnsafeCrate {
-                          locations: HashSet::<UnsafeCode>::new(),
-                          codemap: &codemap,
-                      };
+    index.iter()
+        .filter(|x| is_valid_file(from_utf8(&x.path).unwrap()))
+        .fold(HashSet::<UnsafeCode>::new(), |accum, i| {
+            let file_path = from_utf8(&i.path).unwrap();
+            let path_buf = Path::new(&prefix).join(file_path);
+            let krate = parse::parse_crate_from_file(
+                path_buf.as_path(),
+                &parse_session
+            ).unwrap();
+            let mut unsafe_code = UnsafeCrate {
+                locations: HashSet::<UnsafeCode>::new(),
+                codemap: &codemap,
+            };
 
-                      // Warning this has side-effects!
-                      unsafe_code.visit_mod(&krate.module, krate.span, NodeId::new(0));
+            // Warning this has side-effects!
+            unsafe_code.visit_mod(&krate.module, krate.span, NodeId::new(0));
 
-                      if unsafe_code.locations.len() > 0 {
-                          accum.union(&unsafe_code.locations)
-                              .cloned()
-                              .collect::<HashSet<UnsafeCode>>()
-                      } else {
-                          accum
-                      }
-                })
-        },
-        Err(e) => panic!("Failed to parse: {}", e),
-    }
+            if unsafe_code.locations.len() > 0 {
+                accum.union(&unsafe_code.locations)
+                    .cloned()
+                    .collect::<HashSet<UnsafeCode>>()
+            } else {
+                accum
+            }
+        })
 }
 
 #[test]
@@ -128,7 +123,9 @@ fn test_safety_infractions() {
     assert!(actual.len() == 0);
 }
 
-// Called with an argument for a git url of the project to check
+// Args:
+// - git url of the project to check
+// - optional commit sha to checkout
 //
 // Environment variables:
 // - HARBOR_HOME: Path to a directory that the process has write access to
