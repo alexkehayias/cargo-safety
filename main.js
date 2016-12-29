@@ -32,6 +32,7 @@ exports.handler = function(event, context, callback) {
 	    return callback(err, null);
 	}
 
-	return callback(null, out);
+	// lol parsing from json just to have aws serialize it again :(
+	return callback(null, JSON.parse(out));
     });
 }
