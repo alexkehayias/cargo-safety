@@ -8,7 +8,7 @@ extern crate serde_derive;
 extern crate serde_json;
 extern crate harbor;
 
-use git2::Repository;
+use git2::{Repository, Oid, ResetType, ObjectType};
 use std::env;
 use std::rc::Rc;
 use std::path::{Path};
@@ -134,6 +134,7 @@ fn test_safety_infractions() {
 // - HARBOR_HOME: Path to a directory that the process has write access to
 fn main() {
     let git_url = env::args().nth(1);
+    let git_commit = env::args().nth(2);
     let home_dir = match env::var("HARBOR_HOME") {
         Ok(val) => val,
         Err(_) => String::from(".harbor"),
@@ -143,6 +144,14 @@ fn main() {
             let name = git_url_to_name(&url);
             let path = format!("{root}/{path}", root=home_dir, path=name);
             let repo = get_or_clone(&url, &path);
+
+            // If we got a commit reset hard to that otherwise use the default
+            if let Some(commit) = git_commit {
+                let oid = Oid::from_str(&commit).unwrap();
+                let target = repo.find_object(oid, Some(ObjectType::Commit)).unwrap();
+                repo.reset(&target, ResetType::Hard, None).unwrap();
+            }
+
             let infractions = safety_infractions(path, repo);
             let passed = infractions.len() == 0;
             let report = SafetyReport::new(url, passed, infractions);
