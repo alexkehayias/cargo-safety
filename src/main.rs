@@ -21,7 +21,13 @@ use syntex_errors::emitter::{ColorConfig};
 // The codemap is necessary to go from a `Span` to actual line & column
 // numbers for closures.
 struct UnsafeLocations<'a> {
+    // Format {
+    //   kind: <unsafe_block | unsafe_impl | unsafe_block | unsafe_trait>,
+    //   location: <See CodeMap.span_to_expanded_string for format details>
+    // }
+    //
     locations: HashMap<String, String>,
+    // Used to go from a Span to line:column information
     codemap: &'a CodeMap,
 }
 
@@ -121,21 +127,23 @@ impl<'a> Visitor for UnsafeLocations<'a> {
     }
 }
 
-fn find_unsafe_blocks<'a>(krate: &Crate, codemap: &'a Rc<CodeMap>)
-                          -> UnsafeLocations<'a> {
-    let mut visitor = UnsafeLocations {
+// Finds all unsafe code by walking the crate via the Visitor trait
+fn find_unsafe_code<'a>(krate: &Crate, codemap: &'a Rc<CodeMap>)
+                        -> UnsafeLocations<'a> {
+    let mut unsafe_code = UnsafeLocations {
         locations: HashMap::new(),
         codemap: codemap,
     };
-    visitor.visit_mod(&krate.module, krate.span, NodeId::new(0));
-    visitor
+    unsafe_code.visit_mod(&krate.module, krate.span, NodeId::new(0));
+    unsafe_code
 }
 
-
+// Returns the project name by extracting it from the git url
 pub fn git_url_to_name(git_url: &String) -> String {
     git_url.split("/").collect::<Vec<&str>>().last().unwrap().to_lowercase()
 }
 
+// Returns a repository by fetching it from disk or cloning it fresh
 pub fn get_or_clone(git_url: &String, path: &String) -> Repository {
     match Repository::open(path) {
         Ok(repo) => repo,
@@ -152,7 +160,8 @@ pub fn is_rust_file(file_path: &str) -> bool {
     file_path.contains(".rs")
 }
 
-// Exclude
+// Returns false for any directories that should be excluded based on
+// cargo conventions
 pub fn is_in_valid_dir(file_path: &str) -> bool {
     !(file_path.contains("examples") ||
       file_path.contains("target") ||
@@ -163,8 +172,7 @@ pub fn is_valid_file(file_path: &str) -> bool {
     is_rust_file(file_path) && is_in_valid_dir(file_path)
 }
 
-// Read the main file and load the AST then search the AST
-// for any `unsafe` keywords
+// Iterate through all files in the repo and return all safety infractions
 pub fn safety_infractions<'a>(prefix: String, repo: Repository)
                               -> Vec<HashMap<String, String>> {
     let codemap = Rc::new(CodeMap::new());
@@ -180,7 +188,7 @@ pub fn safety_infractions<'a>(prefix: String, repo: Repository)
                 // println!("Checking file: {}", file_path);
                 let path_buf = Path::new(&prefix).join(file_path);
                 let ast = parse::parse_crate_from_file(path_buf.as_path(), &parse_session);
-                let blocks = find_unsafe_blocks(&ast.unwrap(), &codemap);
+                let blocks = find_unsafe_code(&ast.unwrap(), &codemap);
                 if blocks.locations.len() > 0 {
                     // println!("Found unsafe: {:?}", blocks.locations);
                     accum.push(blocks.locations);
