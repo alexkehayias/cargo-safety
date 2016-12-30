@@ -36,33 +36,39 @@ fn test_git_url_to_name() {
 
 // Returns a repository by fetching it from disk or cloning it
 // If the repo already exists it will fetch the latest from origin
-pub fn get_or_clone(git_url: &String, path: &String) -> Repository {
+pub fn get_or_clone(git_url: &String, path: &String) -> Result<Repository, git2::Error> {
     match Repository::open(path) {
-        // If we already have it on disk, fetch the latest
+        // If we already have it on disk, fetch the latest. Early return on
+        // any errors.
         Ok(repo) => {
+            // Fetch the latest from remote origin
             repo.find_remote(&"origin")
-                .unwrap()
-                .fetch(&[], None, None)
-                .unwrap();
-            repo.set_head(
-                // TODO: this is gross, why can't I let bind this without
-                // the borrow checker throwing up?
-                &repo.find_branch("origin/master", BranchType::Remote)
-                    .unwrap()
-                    .get()
-                    .name()
-                    .unwrap()
-            ).unwrap();
-            repo.checkout_head(None).unwrap();
-            repo
+                .or_else(|err| return Err(err))
+                .and_then(|mut remote| remote.fetch(&[], None, None))
+                .or_else(|err| return Err(err))
+                .ok();
+
+            // Default to master branch
+            match repo.find_branch("origin/master", BranchType::Remote) {
+                Ok(branch) => {
+                    if let Some(name) = branch.get().name() {
+                        repo.set_head(name)
+                            .or_else(|err| return Err(err))
+                            .ok();
+                        repo.checkout_head(None)
+                            .or_else(|err| return Err(err))
+                            .ok();
+                    } else {
+                        return Err(git2::Error::from_str("No branch name found"))
+                    }
+                },
+                Err(err) => return Err(err),
+            }
+
+            Ok(repo)
         },
         // Otherwise clone it
-        Err(_) => {
-            match Repository::clone(git_url, path) {
-                Ok(repo) => repo,
-                Err(e) => panic!("Failed to clone: {}", e),
-            }
-        }
+        Err(_) => Repository::clone(git_url, path),
     }
 }
 
@@ -159,7 +165,7 @@ fn main() {
         Some(url) => {
             let name = git_url_to_name(&url);
             let path = format!("{root}/{path}", root=home_dir, path=name);
-            let repo = get_or_clone(&url, &path);
+            let repo = get_or_clone(&url, &path).unwrap();
 
             // If we got a commit reset hard to that otherwise use the default
             if let Some(commit) = git_commit {
