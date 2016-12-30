@@ -1,7 +1,8 @@
 use std::collections::{HashSet};
 use syntex_syntax::codemap::{CodeMap, Span};
 use syntex_syntax::ast::{NodeId, Block, FnDecl, Mac, Unsafety, BlockCheckMode,
-                         TraitItem, ImplItemKind, ImplItem, TraitItemKind};
+                         TraitItem, ImplItemKind, ImplItem, TraitItemKind,
+                         Attribute, MetaItemKind};
 use syntex_syntax::visit::{self, Visitor, FnKind};
 
 
@@ -12,6 +13,7 @@ enum UnsafeKind {
     unsafe_impl,
     unsafe_block,
     unsafe_trait,
+    unsafe_attr,
 }
 
 #[derive(Hash, Eq, PartialEq, Debug, Clone, Serialize)]
@@ -84,7 +86,7 @@ impl<'a> Visitor for UnsafeCrate<'a> {
         visit::walk_block(self, block);
     }
 
-    // // Capture any unsafe traits
+    // Capture any unsafe traits
     fn visit_trait_item(&mut self, ti: &TraitItem) {
         match ti.node {
             TraitItemKind::Const(_, _) => (),
@@ -103,7 +105,7 @@ impl<'a> Visitor for UnsafeCrate<'a> {
         };
     }
 
-    // // Capture any unsafe implementations
+    // Capture any unsafe implementations
     fn visit_impl_item(&mut self, ii: &ImplItem) {
         match ii.node {
             ImplItemKind::Const(_, _) => (),
@@ -119,6 +121,22 @@ impl<'a> Visitor for UnsafeCrate<'a> {
                     self.locations.insert(record);
                 }
             },
+        };
+    }
+
+    // Capture unsafe destructor attribute i.e #["unsafe_destructor_blind_to_params"]
+    fn visit_attribute(&mut self, attr: &Attribute) {
+        match attr.value.node {
+            MetaItemKind::List(_) => (),
+            MetaItemKind::NameValue(_) => (),
+            MetaItemKind::Word =>
+                if attr.value.name == "unsafe_destructor_blind_to_params" {
+                    let record = UnsafeCode::new(
+                        UnsafeKind::unsafe_attr,
+                        self.codemap.span_to_expanded_string(attr.span),
+                    );
+                    self.locations.insert(record);
+                },
         };
     }
 }
