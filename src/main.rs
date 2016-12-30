@@ -21,7 +21,7 @@ use syntex_syntax::visit::{Visitor};
 use syntex_errors::{Handler};
 use syntex_errors::emitter::{ColorConfig};
 use harbor::checks::{UnsafeCrate, UnsafeCode};
-use harbor::reports::{SafetyReport};
+use harbor::reports::{SafetyReport, Status};
 
 
 // Returns the project name by extracting it from the git url
@@ -175,8 +175,8 @@ fn main() {
             }
 
             let infractions = safety_infractions(path, repo);
-            let passed = infractions.len() == 0;
-            let report = SafetyReport::new(url, passed, infractions);
+            let status = Status::from_bool(infractions.len() == 0);
+            let report = SafetyReport::new(url, status, infractions);
             print!("{}", serde_json::to_string(&report).unwrap());
         }
         None => {

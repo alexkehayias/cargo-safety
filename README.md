@@ -21,6 +21,8 @@ Output:
 
 ```
 {
+    "repo_url": "https://github.com/SergioBenitez/Rocket",
+    "status": "failed",
     "offenses": [
         {
             "kind": "unsafe_block",
@@ -38,9 +40,7 @@ Output:
             "kind": "unsafe_block",
             "occurences": "/tmp/rocket/lib/src/config/mod.rs:307:5: 314:6\n`unsafe {\n        INIT.call_once(|| {\n            ...`\n"
         }
-    ],
-    "repo_url": "https://github.com/SergioBenitez/Rocket",
-    "status": false
+    ]
 }
 
 ```
