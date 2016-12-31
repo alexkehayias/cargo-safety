@@ -45,6 +45,12 @@ Output:
 
 ```
 
+Usage with `cargo`:
+
+```
+rustup run nightly cargo run <git url> <optional commit sha>
+```
+
 ## What's next?
 
 ### Badges!!
