@@ -53,8 +53,6 @@ impl<'a> Visitor for UnsafeCrate<'a> {
                 span: Span,
                 _id: NodeId) {
         match fn_kind {
-            FnKind::Method(_, _, _, _) => (),
-            FnKind::Closure(_) => (),
             FnKind::ItemFn(_, _, unsafety, _, _, _, _) => {
                 match unsafety {
                     Unsafety::Normal => (),
@@ -66,7 +64,8 @@ impl<'a> Visitor for UnsafeCrate<'a> {
                         self.locations.insert(record);
                     },
                 };
-            }
+            },
+            _ => (),
         };
         visit::walk_fn(self, fn_kind, fn_decl, span);
     }
@@ -89,9 +88,6 @@ impl<'a> Visitor for UnsafeCrate<'a> {
     // Capture any unsafe traits
     fn visit_trait_item(&mut self, ti: &TraitItem) {
         match ti.node {
-            TraitItemKind::Const(_, _) => (),
-            TraitItemKind::Type(_, _) => (),
-            TraitItemKind::Macro(_) => (),
             TraitItemKind::Method(ref sig, _) => match sig.unsafety {
                 Unsafety::Normal => (),
                 Unsafety::Unsafe => {
@@ -102,15 +98,13 @@ impl<'a> Visitor for UnsafeCrate<'a> {
                     self.locations.insert(record);
                 },
             },
+            _ => (),
         };
     }
 
     // Capture any unsafe implementations
     fn visit_impl_item(&mut self, ii: &ImplItem) {
         match ii.node {
-            ImplItemKind::Const(_, _) => (),
-            ImplItemKind::Type(_) => (),
-            ImplItemKind::Macro(_) => (),
             ImplItemKind::Method(ref sig, _) => match sig.unsafety {
                 Unsafety::Normal => (),
                 Unsafety::Unsafe => {
@@ -121,14 +115,13 @@ impl<'a> Visitor for UnsafeCrate<'a> {
                     self.locations.insert(record);
                 }
             },
+            _ => (),
         };
     }
 
     // Capture unsafe destructor attribute i.e #["unsafe_destructor_blind_to_params"]
     fn visit_attribute(&mut self, attr: &Attribute) {
         match attr.value.node {
-            MetaItemKind::List(_) => (),
-            MetaItemKind::NameValue(_) => (),
             MetaItemKind::Word =>
                 if attr.value.name == "unsafe_destructor_blind_to_params" {
                     let record = UnsafeCode::new(
@@ -137,6 +130,7 @@ impl<'a> Visitor for UnsafeCrate<'a> {
                     );
                     self.locations.insert(record);
                 },
+            _ => (),
         };
     }
 }
