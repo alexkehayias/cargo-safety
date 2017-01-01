@@ -2,7 +2,7 @@ use std::collections::{HashSet};
 use syntex_syntax::codemap::{CodeMap, Span};
 use syntex_syntax::ast::{NodeId, Block, FnDecl, Mac, Unsafety, BlockCheckMode,
                          TraitItem, ImplItemKind, ImplItem, TraitItemKind,
-                         Attribute, MetaItemKind};
+                         Attribute, MetaItemKind, Item, ItemKind};
 use syntex_syntax::visit::{self, Visitor, FnKind};
 
 
@@ -11,8 +11,10 @@ use syntex_syntax::visit::{self, Visitor, FnKind};
 enum UnsafeKind {
     unsafe_function,
     unsafe_impl,
+    unsafe_impl_item,
     unsafe_block,
     unsafe_trait,
+    unsafe_trait_item,
     unsafe_attr,
 }
 
@@ -45,6 +47,37 @@ pub struct UnsafeCrate<'a> {
 impl<'a> Visitor for UnsafeCrate<'a> {
     // Implement this otherwise it will panic when it hits a macro
     fn visit_mac(&mut self, _mac: &Mac) {}
+
+    // Capture unsafe items i.e unsafe impl Trait for Foo
+    fn visit_item(&mut self, item: &Item) {
+        match item.node {
+            ItemKind::Impl(unsafety, ..) => {
+                match unsafety {
+                    Unsafety::Normal => (),
+                    Unsafety::Unsafe => {
+                        let record = UnsafeCode::new(
+                            UnsafeKind::unsafe_impl,
+                            self.codemap.span_to_expanded_string(item.span),
+                        );
+                        self.locations.insert(record);
+                    },
+                }
+            },
+            ItemKind::Trait(unsafety, ..) => {
+                match unsafety {
+                    Unsafety::Normal => (),
+                    Unsafety::Unsafe => {
+                        let record = UnsafeCode::new(
+                            UnsafeKind::unsafe_trait,
+                            self.codemap.span_to_expanded_string(item.span),
+                        );
+                        self.locations.insert(record);
+                    },
+                }
+            },
+            _ => (),
+        }
+    }
 
     // Recursively capture all occurences of unsafe functions
     fn visit_fn(&mut self,
@@ -92,7 +125,7 @@ impl<'a> Visitor for UnsafeCrate<'a> {
                 Unsafety::Normal => (),
                 Unsafety::Unsafe => {
                     let record = UnsafeCode::new(
-                        UnsafeKind::unsafe_trait,
+                        UnsafeKind::unsafe_trait_item,
                         self.codemap.span_to_expanded_string(ti.span),
                     );
                     self.locations.insert(record);
@@ -109,7 +142,7 @@ impl<'a> Visitor for UnsafeCrate<'a> {
                 Unsafety::Normal => (),
                 Unsafety::Unsafe => {
                     let record = UnsafeCode::new(
-                        UnsafeKind::unsafe_impl,
+                        UnsafeKind::unsafe_impl_item,
                         self.codemap.span_to_expanded_string(ii.span),
                     );
                     self.locations.insert(record);
