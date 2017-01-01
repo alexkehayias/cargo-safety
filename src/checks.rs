@@ -76,7 +76,8 @@ impl<'a> Visitor for UnsafeCrate<'a> {
                 }
             },
             _ => (),
-        }
+        };
+        visit::walk_item(self, item);
     }
 
     // Recursively capture all occurences of unsafe functions
