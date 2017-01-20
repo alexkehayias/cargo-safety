@@ -2,7 +2,7 @@
 name = "harbor"
 version = "0.1.0"
 authors = ["Alex Kehayias"]
-description = "Safety checks for Rust git repos"
+description = "Safety checks for Rust crates"
 repository = "https://github.com/alexkehayias/harbor"
 
 [dependencies]
@@ -13,3 +13,4 @@ syntex_errors = "0.52.0"
 serde = "0.8"
 serde_derive = "0.8"
 serde_json = "0.8"
+glob = "*"

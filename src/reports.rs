@@ -21,15 +21,15 @@ impl Status {
 
 #[derive(Debug, Serialize)]
 pub struct SafetyReport {
-    repo_url: String,
+    lib_name: String,
     status: Status,
     offenses: HashSet<UnsafeCode>,
 }
 
 impl SafetyReport {
-    pub fn new(repo_url: String,
+    pub fn new(lib_name: String,
                status: Status,
                offenses: HashSet<UnsafeCode>) -> SafetyReport {
-        SafetyReport {repo_url: repo_url, status: status, offenses: offenses}
+        SafetyReport {lib_name: lib_name, status: status, offenses: offenses}
     }
 }
