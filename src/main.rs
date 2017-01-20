@@ -52,7 +52,7 @@ pub fn safety_infractions<'a>(root: &Path) -> HashSet<UnsafeCode> {
 
     glob(root.join("*.rs").to_str().unwrap()).expect("Failed to glob")
         .filter_map(Result::ok)
-        .filter(|x| is_valid_dir(x.to_str().expect("dawg")))
+        .filter(|x| is_valid_dir(x.to_str().expect("Failed to coerce to string")))
         .fold(HashSet::<UnsafeCode>::new(), |accum, path_buf| {
             let file_path = path_buf.as_path();
 
