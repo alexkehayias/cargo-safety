@@ -14,6 +14,23 @@ Note: nightly build required
 cargo install harbor && cargo harbor
 ```
 
+Output (json):
+
+```
+[
+  {
+    "lib_name": "gcc",
+    "status": "failed",
+    "offenses": [
+      {
+        "occurences": "\/Users\/alexkehayias\/.cargo\/registry\/src\/github.com-1ecc6299db9ec823\/gcc-0.3.40\/src\/registry.rs:73:1: 73:29\n`unsafe impl Sync for Repr {}`\n",
+        "kind": "unsafe_impl"
+      }
+	]
+  }
+]
+```
+
 ## License
 
 Copyright © 2017 Alex Kehayias
