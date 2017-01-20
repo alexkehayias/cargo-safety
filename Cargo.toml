@@ -5,6 +5,7 @@ authors = ["Alex Kehayias"]
 description = "Safety checks for Rust crates"
 repository = "https://github.com/alexkehayias/harbor"
 license = "Eclipse Public License either version 1.0 or (at your option) any later version"
+keywords = ["cargo", "plugin", "safety", "safe", "checks"]
 
 [dependencies]
 git2 = "0.6"
