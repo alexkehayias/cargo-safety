@@ -11,7 +11,7 @@ In coming to Rust, many people are drawn to it's promises of safety. I was curio
 Note: nightly build required
 
 ```
-cargo install harbor && cargo harbor
+cargo install safety && cargo safety
 ```
 
 Output (json):
