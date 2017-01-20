@@ -6,7 +6,7 @@ extern crate git2;
 #[macro_use]
 extern crate serde_derive;
 extern crate serde_json;
-extern crate safety;
+extern crate cargo_safety;
 
 use git2::{Repository, Oid, ResetType, ObjectType, BranchType};
 use std::env;
@@ -21,8 +21,8 @@ use syntex_syntax::visit::{Visitor};
 use syntex_errors::{Handler};
 use syntex_errors::emitter::{ColorConfig};
 
-use safety::checks::{UnsafeCrate, UnsafeCode};
-use safety::reports::{SafetyReport, Status};
+use cargo_safety::checks::{UnsafeCrate, UnsafeCode};
+use cargo_safety::reports::{SafetyReport, Status};
 
 
 // Returns the project name by extracting it from the git url
