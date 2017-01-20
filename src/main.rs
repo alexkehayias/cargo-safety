@@ -6,7 +6,7 @@ extern crate syntex_errors;
 #[macro_use]
 extern crate serde_derive;
 extern crate serde_json;
-extern crate harbor;
+extern crate safety;
 
 use std::rc::Rc;
 use std::path::{Path};
@@ -22,8 +22,8 @@ use syntex_syntax::visit::{Visitor};
 use syntex_errors::{Handler};
 use syntex_errors::emitter::{ColorConfig};
 
-use harbor::checks::{UnsafeCrate, UnsafeCode};
-use harbor::reports::{SafetyReport, Status};
+use safety::checks::{UnsafeCrate, UnsafeCode};
+use safety::reports::{SafetyReport, Status};
 
 
 // Returns false for any directories that should be excluded based on

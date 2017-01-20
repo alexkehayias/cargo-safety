@@ -1,5 +1,5 @@
 [root]
-name = "harbor"
+name = "safety"
 version = "0.1.0"
 dependencies = [
  "git2 0.6.3 (registry+https://github.com/rust-lang/crates.io-index)",

@@ -1,5 +1,5 @@
 [package]
-name = "harbor"
+name = "safety"
 version = "0.1.0"
 authors = ["Alex Kehayias"]
 description = "Safety checks for Rust crates"
