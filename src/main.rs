@@ -1,5 +1,3 @@
-#![feature(proc_macro)]
-
 extern crate glob;
 extern crate syntex_syntax;
 extern crate syntex_errors;
