@@ -1,6 +1,6 @@
 [package]
 name = "cargo-safety"
-version = "0.1.0"
+version = "0.1.1"
 authors = ["Alex Kehayias"]
 description = "Safety checks for Rust crates"
 repository = "https://github.com/alexkehayias/cargo-safety"
